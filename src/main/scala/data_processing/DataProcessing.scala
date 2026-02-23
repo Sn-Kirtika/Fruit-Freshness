@@ -31,9 +31,8 @@ object DataProcessing {
   def write_file(data: Array[Array[Double]], path: String): Unit = {
     val file = new File(path)
     val writer = new PrintWriter(file)
-    data.foreach { row =>
-      writer.println(row.mkString(","))
-    }
+    val flattened = data.flatten
+    writer.println(flattened.mkString(","))
     writer.close()
   }
 
@@ -47,7 +46,7 @@ object DataProcessing {
     Some(imageToMatrix(resized_image))
   }
 
-  def resize(img: BufferedImage, newW: Int = 20, newH: Int = 20): BufferedImage = {
+  def resize(img: BufferedImage, newW: Int = 32, newH: Int = 32): BufferedImage = {
     val tmp = img.getScaledInstance(newW, newH, Image.SCALE_SMOOTH)
     val resized = new BufferedImage(newW, newH, BufferedImage.TYPE_INT_ARGB)
     val g2d = resized.createGraphics()
@@ -61,7 +60,15 @@ object DataProcessing {
     val h = img.getHeight
 
     Array.tabulate(h, w) { (y, x) =>
-      img.getRGB(x, y)
+      val pixel = img.getRGB(x, y)
+
+      val r = (pixel >> 16) & 0xff
+      val g = (pixel >> 8) & 0xff
+      val b = pixel & 0xff
+
+      val gray = 0.299 * r + 0.587 * g + 0.114 * b
+      
+      gray / 255.0
     }
   }
 }
