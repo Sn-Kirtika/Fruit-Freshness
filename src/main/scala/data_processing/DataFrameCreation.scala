@@ -1,34 +1,60 @@
 package data_processing
 
 import java.io.File
-import pd.DataFrame
+import com.github.mjakubowski84.parquet4s._
+import scala.io.Source
+
+case class ImageSample(
+              image: Array[Array[Double]],
+              label: Int
+            )
 
 object DataFrameCreation {
   
   def main(args: Array[String]): Unit = {
+
+    System.setProperty("hadoop.home.dir", "C:\\hadoop")
+
     val data_dir = "data"
 
     val fresh_dir = new File(data_dir + "/processed/fresh")
 
-    val fresh_files = fresh_dir.list()//.slice(0,5)
+    val fresh_files = fresh_dir.list()//.slice(0, 5)
 
-    val fresh_dfs = fresh_files.map(f => DataFrame.io.csv(header = false, delimiter = ',').read(data_dir + "/processed/fresh/" + f))
-    val fresh_arrays = fresh_dfs.map(df => df.columns.map(col => df(col).map(_.toString.toDouble).toArray).toArray)
+    val fresh_arrays = fresh_files.map { f =>
+      readCsv(data_dir + "/processed/fresh/" + f)
+    }
 
-    val df_fresh = DataFrame(image = fresh_arrays, label = Seq.fill(fresh_arrays.length)(1))
+    val fresh_data: Seq[ImageSample] =
+      fresh_arrays.map(arr => ImageSample(arr, 1))
 
     val rotten_dir = new File(data_dir + "/processed/rotten")
 
     val rotten_files = rotten_dir.list()//.slice(0, 5)
 
-    val rotten_dfs = rotten_files.map(f => DataFrame.io.csv(header = false, delimiter = ',').read(data_dir + "/processed/rotten/" + f))
-    val rotten_arrays = rotten_dfs.map(df => df.columns.map(col => df(col).map(_.toString.toDouble).toArray).toArray)
+    val rotten_arrays = rotten_files.map { f =>
+      readCsv(data_dir + "/processed/rotten/" + f)
+    }
 
-    val df_rotten = DataFrame(image = rotten_arrays, label = Seq.fill(rotten_arrays.length)(0))
+    val rotten_data: Seq[ImageSample] =
+      rotten_arrays.map(arr => ImageSample(arr, 0))
 
-    val df_combined = DataFrame.union(df_fresh, df_rotten)
-    println(df_combined)
-    // Charger dans un parquet ou directement en Python
+    val combined: Seq[ImageSample] =
+      fresh_data ++ rotten_data
+
+    // Charger dans un parquet
+    ParquetWriter.of[ImageSample].writeAndClose(com.github.mjakubowski84.parquet4s.Path(data_dir + "/dataframe/data.parquet"), combined)
+  }
+
+  def readCsv(path: String): Array[Array[Double]] = {
+    val source = Source.fromFile(path)
+    try {
+      source.getLines().toArray.map { line =>
+        line.split(",").map(_.toDouble)
+      }
+    } finally {
+      source.close()
+    }
   }
 
 
