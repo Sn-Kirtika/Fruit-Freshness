@@ -31,8 +31,9 @@ object DataProcessing {
   def write_file(data: Array[Array[Double]], path: String): Unit = {
     val file = new File(path)
     val writer = new PrintWriter(file)
-    val flattened = data.flatten
-    writer.println(flattened.mkString(","))
+    data.foreach { row =>
+      writer.println(row.mkString(","))
+    }
     writer.close()
   }
 
