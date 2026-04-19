@@ -8,7 +8,7 @@ import scala.jdk.CollectionConverters._
 import java.awt.Image
 import java.awt.image.BufferedImage
 import java.io.{BufferedWriter, File, FileWriter}
-import java.nio.file.{Files, Paths}
+import java.nio.file.{Files, Paths, StandardCopyOption}
 import javax.imageio.ImageIO
 
 object PredictionService {
@@ -17,38 +17,46 @@ object PredictionService {
   def main(args: Array[String]): Unit = {
 
     val dir = Paths.get(s"${data_dir}/input")
-    val file = Files.list(dir).iterator().asScala.toList.head
+    val files = Files.list(dir).iterator().asScala.toList
 
-    val transformed_data = convert_image(file.toString)
-    transformed_data match {
-      case Some(data) => {
-        val env = OrtEnvironment.getEnvironment
-        val session = env.createSession(s"${model_dir}/fruit_model.onnx", new OrtSession.SessionOptions())
+    files.foreach { file =>
 
-        val tensor = OnnxTensor.createTensor(
-          env,
-          FloatBuffer.wrap(data.flatten.map(_.toFloat)),
-          Array(1L, 32L, 32L, 1L)
-        )
+      val transformed_data = convert_image(file.toString)
+      transformed_data match {
+        case Some(data) => {
+          val env = OrtEnvironment.getEnvironment
+          val session = env.createSession(s"${model_dir}/fruit_model.onnx", new OrtSession.SessionOptions())
 
-        val inputName = session.getInputNames.iterator().next()
-        val inputs = Map(inputName -> tensor).asJava
-        val results = session.run(inputs)
+          val tensor = OnnxTensor.createTensor(
+            env,
+            FloatBuffer.wrap(data.flatten.map(_.toFloat)),
+            Array(1L, 32L, 32L, 1L)
+          )
 
-        val output = results.get(0).getValue.asInstanceOf[Array[Array[Float]]]
+          val inputName = session.getInputNames.iterator().next()
+          val inputs = Map(inputName -> tensor).asJava
+          val results = session.run(inputs)
 
-        val prediction = output(0)(0)
-        val rotten_fresh = if (prediction > .6) "FRESH" else "ROTTEN"
+          val output = results.get(0).getValue.asInstanceOf[Array[Array[Float]]]
 
-        val csv_file = new File(s"$data_dir/predictions.csv")
-        val writer = new BufferedWriter(new FileWriter(csv_file, true))
-        writer.write(s"$file,$prediction,$rotten_fresh")
-        writer.newLine()
-        writer.close()
+          val prediction = output(0)(0)
+          val rotten_fresh = if (prediction > .5) "FRESH" else "ROTTEN"
 
-        Files.deleteIfExists(file)
+          val csv_file = new File(s"$data_dir/predictions.csv")
+          val writer = new BufferedWriter(new FileWriter(csv_file, true))
+          writer.write(s"${file.getFileName},$prediction,$rotten_fresh")
+          writer.newLine()
+          writer.close()
+
+          Files.move(
+            file,
+            Paths.get(file.toString.replaceFirst("input", "archive")),
+            StandardCopyOption.REPLACE_EXISTING
+          )
+        }
+        case None => println(s"Error Reading : ${file}")
       }
-      case None => println(s"Error Reading : ${file}")
+
     }
 
   }
