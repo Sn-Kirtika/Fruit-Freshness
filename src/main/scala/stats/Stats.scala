@@ -1,5 +1,4 @@
 import org.apache.spark.sql.SparkSession
-import spark.implicits._
 
 case class FruitImage(
                        path: String,
@@ -89,6 +88,7 @@ object Stats {
       .master("local[*]")
       .getOrCreate()
 
+    import spark.implicits._
 
     val images = List(
       FruitImage("img1.jpg", "fresh",  "apple",  100, 100, true,  "train"),
